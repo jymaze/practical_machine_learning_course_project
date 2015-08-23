@@ -1,0 +1,130 @@
+---
+title: 'Human Activity Recognition: Data From Wearable Devices'
+author: "jymaze"
+output:
+  html_document:
+    highlight: kate
+    theme: cerulean
+---
+
+### Executive Summary  
+
+#### Materials
+Human Activity Recognition - HAR - has emerged as a key research area in the last years. Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. There are many potential applications for HAR, such as: elderly monitoring, life log systems for monitoring energy expenditure and for supporting weight-loss programs, and digital assistants for weight lifting exercises.This small project uses a dataset with 5 classes (sitting-down, standing-up, standing, walking, and sitting) collected on 8 hours of activities of 4 healthy subjects. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+#### Methods
+The dataset was split into a training set and a test set of size 70% and 30% of the original dataset, respectively. A random forest model (300 trees) was then fitted to the training set using a 3-fold cross-validation. The variable importance in the resulting model was also calculated in term of accuracy.
+
+#### Results
+The random forest model yielded an out-of-bag estimate of error rate of 0.76%. Analysis of variables importance showed that the variables roll_belt, pitch_forearm, and yaw_belt, were the most important. The existence of significant correlation between some variables may have rendered the measure of importance inaccurate though. Prediction accuracy on the test set was excellent, at 0.9944. The random Forest model was highly performant on this dataset.
+
+### A. Getting and Cleaning the Data  
+
+```{r echo=FALSE, warning=FALSE}
+directory <- '//eu.boehringer.com/users/col/users4/jmaziere/Desktop/Coursera_Data_Science/practical_machine_learning/course_project/'
+url_train <- paste0(directory, 'pml-training.csv')
+url_ext_test <- paste0(directory, 'pml-testing.csv')
+library(caret)
+library(randomForest)
+library(corrplot)
+```
+
+We load the data from the csv file.
+
+```{r}
+d <- read.csv(url_train, stringsAsFactors=FALSE)
+dim(d)
+```
+
+The dataset comprises 19622 rows and 160 columns (variables).
+
+We suppress the 7 first columns as they are not relevant to our analysis.
+We then isolate the vector of values to be predicted ('classe'). In the rest of the dataset, we keep only the columns with numerical values and for which no data is missing.
+
+```{r}
+d <- d[ ,8:ncol(d)]
+d[,'classe'] <- as.factor(d[ ,'classe'])
+classe <- d[ ,'classe'] # save the classe column
+d <- d[ ,sapply(d, is.numeric)] # as side-effect, this deletes the class column
+
+# helper function finding the proportion of missing value for a vector
+find_na_columns <- function(x) { 
+    mean(is.na(x))
+}
+
+d <- d[ ,sapply(d, find_na_columns) == 0] # keep columns with no NA
+```
+
+Data cleaning is complete. We now split the dataset into a training set (70%) and a test set (30%). We apply the same partition to the 'classe' vector.
+
+```{r}
+set.seed(3456) # for reproducibility
+inTrain <- createDataPartition(y=classe, p=0.7, list=FALSE)
+train_d <- d[inTrain, ]
+test_d <- d[-inTrain, ]
+train_classe <- classe[inTrain]
+test_classe <- classe[-inTrain]
+```
+
+### B. Fitting a Random Forest Model  
+
+We fit a 300 tree random forest model using a 3-fold cross validation on the training set. The predicted value is the activity quality ('classe' vector), and the predictors are the activity monitors in the training set. A random forest model was chosen for its excellent accuracy among current algorithms, its capacity to handle thousands of input variables without variable deletion, and it capacity to estimate what variables are important in the classification. It also generates an internal unbiased estimate of the out-of-sample error rate during the forest building progresses.
+
+```{r cache=T}
+fitCtrl <- trainControl(method = 'cv', number = 3)
+model_rf <- train(x=train_d, y=train_classe, method = 'rf', ntree=300, importance=TRUE, trControl = fitCtrl)
+model_rf$finalModel
+```
+
+The fit is excellent, with an very low out-of-bag estimate of error rate of 0.76%. Because of the characteristics of the random forest building process, this constitutes a good estimation of the real out-of-sample error, which will be assessed on the test set.
+
+### C. Analyzing the Variables Importance  
+
+Variables importance is extracted from the model and the 15 most important variables are represented in a bar graph.
+
+```{r}
+importance_raw <- importance(model_rf$finalModel, type=2)
+importance_df <- data.frame(cbind('names'=rownames(importance_raw),'mean_decrease_acc'=importance_raw[ ,1]),row.names=NULL)
+importance_df$mean_decrease_acc <- as.numeric(as.character(importance_df$mean_decrease_acc))
+importance_df <- importance_df[order(importance_df$mean_decrease_acc, decreasing=TRUE), ]
+subset_importance <- importance_df[1:15, ]
+ggplot(data=subset_importance, aes(x=reorder(names,mean_decrease_acc,FUN=function(x) -x), y=mean_decrease_acc))+
+    geom_bar(stat='identity', color='cadetblue', fill=heat.colors(20)[1:15], width=0.7)+
+    xlab('')+ylab('Mean Decrease in Accuracy')+
+    ggtitle('Plot of the 15 Most Important Variables')+
+    theme(axis.text.x=element_text(angle=30, hjust=1, color='black', size=12), legend.position='none')
+```
+
+The variables roll_belt, pitch_forearm, and yaw_belt, are the 3 most important in this random forest model. It should be noted that in this dataset some of the variables seems to be relatively strongly correlated. While it does not impact the performance of the model, it may induce inaccuracies in the variable importance measures (see the correlation matrix plot for this dataset in appendix 1).
+
+### C. Predicting Classes on the Test Set  
+
+We use the model to predict classes on the test set.
+
+```{r}
+prediction_test <- predict(model_rf, newdata=test_d)
+confusionMatrix(prediction_test, test_classe)
+```
+
+As expected, the prediction accuracy is excellent, at 0.9944. Despite its high accuracy on the training set, the random forest model shows its capacity not to overfit as it is just as accurate on an out-of-sample test set. As expected, the out-of-bag estimate of error rate calculated during the fitting of the model was a good estimate of the out-of-sample error rate. For this assignment, prediction was also applied to an external test set of 20 cases (see the prediction for this dataset in appendix 2)
+
+### D. Appendices  
+
+#### Appendix 1: Correlation Matrix
+
+Some clusters of positive correlation between variables have been outlined around the diagonal of the plot. 
+
+```{r fig.height=9, fig.width=9, dpi=200}
+corrplot(cor(train_d), method='color', tl.cex=0.7, order='hclust', addrec=10, insig='blank')
+```
+
+#### Appendix 2: Prediction on an External Test Set
+
+The random forest model is applied to an external test set for which the cases classification is not known.
+```{r}
+ext_test_d <- read.csv(url_ext_test, stringsAsFactors=FALSE)
+ext_test_d <- ext_test_d[ ,8:ncol(ext_test_d)]
+ext_test_d <- ext_test_d[ ,sapply(ext_test_d, is.numeric)]
+ext_test_d <- ext_test_d[ ,sapply(ext_test_d, find_na_columns) == 0]
+predict(model_rf, ext_test_d)
+```
