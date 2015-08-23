@@ -23,7 +23,7 @@ The random forest model yielded an out-of-bag estimate of error rate of 0.76%. A
 ### A. Getting and Cleaning the Data  
 
 ```{r echo=FALSE, warning=FALSE}
-directory <- '//eu.boehringer.com/users/col/users4/jmaziere/Desktop/Coursera_Data_Science/practical_machine_learning/course_project/'
+directory <- '<redacted>'
 url_train <- paste0(directory, 'pml-training.csv')
 url_ext_test <- paste0(directory, 'pml-testing.csv')
 library(caret)
