@@ -2,6 +2,8 @@
 title: 'Human Activity Recognition: Data From Wearable Devices'
 author: "jymaze"
 output:
+  word_document:
+    highlight: kate
   html_document:
     highlight: kate
     theme: cerulean
@@ -68,7 +70,7 @@ test_classe <- classe[-inTrain]
 
 ### B. Fitting a Random Forest Model  
 
-We fit a 300 tree random forest model using a 3-fold cross validation on the training set. The predicted value is the activity quality ('classe' vector), and the predictors are the activity monitors in the training set. A random forest model was chosen for its excellent accuracy among current algorithms, its capacity to handle thousands of input variables without variable deletion, and it capacity to estimate what variables are important in the classification. It also generates an internal unbiased estimate of the out-of-sample error rate during the forest building progresses.
+We fit a 300 tree random forest model using a 3-fold cross validation on the training set. The predicted value is the activity quality ('classe' vector), and the predictors are the activity monitors in the training set. A random forest model was chosen for its excellent accuracy among current algorithms, its capacity to handle thousands of input variables without variable deletion, and it capacity to estimate what variables are important in the classification. It also generates an internal unbiased estimate of the out-of-sample error rate as the forest building progresses.
 
 ```{r cache=T}
 fitCtrl <- trainControl(method = 'cv', number = 3)
